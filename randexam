@@ -68,7 +68,7 @@ DEFAULT_CONFIG = {
     "randomize_questions": True,
     "randomize_variants": True,
     "raw_scan_directory": "",
-    "scantron_CSV": False,
+    "scantron_csv": False,
     "score_decimals": 1,
 }
 
@@ -126,7 +126,7 @@ def main():
     elif command == "proc-scan":
         (K, Q, V, A) = read_specs(config["specs_filename"])
         (N_e, N_Q, N_A) = A.shape
-        if config["scantron_CSV"]:
+        if config["scantron_csv"]:
             (u, k, b) = read_scantrons_CSV(config["scantron_filename"], N_e, N_Q, N_A, config)
         else:
             (u, k, b) = read_scantrons(config["scantron_filename"], N_e, N_Q, N_A, config)
@@ -259,7 +259,7 @@ def read_config(config_filename, default_config):
 
     # input filenames
     config["library_filename"] = prefix + "library.tex"
-    if config["scantron_CSV"]:
+    if config["scantron_csv"]:
         config["scantron_filename"] = prefix + "scantron.csv"
     else:
         config["scantron_filename"] = prefix + "scantron.dat"
@@ -1238,7 +1238,7 @@ def read_scantrons_CSV(input_filename, N_e, N_Q, N_A, config):
             else:
                 key = re.sub("[^1-5 ]", "*", row[3])[0:key_length]
 
-            answers = [ [0,0,0,0,0] if c == " " else binary2bubble(1<<(int(c)-1))
+            answers = [ [0,0,0,0,0] if c == " " else binary2bubble(1<<(int(c)-1), N_A)
                        for c in answers]
             # need to add this to make sure enough answers are present:
             for nq in range(len(answers), N_Q):
@@ -2514,7 +2514,7 @@ def send_email(u, config):
                 log_and_print("ERROR: sending failed to %s: %s" % (to_address, str(e)))
                 log_and_print("Closing current SMTP connection")
                 try:
-                    stmp.quit()
+                    smtp.quit()
                 except:
                     pass
                 smtp = None
