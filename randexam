@@ -68,6 +68,7 @@ DEFAULT_CONFIG = {
     "randomize_questions": True,
     "randomize_variants": True,
     "raw_scan_directory": "",
+    "scantron_CSV": False,
     "score_decimals": 1,
 }
 
@@ -125,7 +126,10 @@ def main():
     elif command == "proc-scan":
         (K, Q, V, A) = read_specs(config["specs_filename"])
         (N_e, N_Q, N_A) = A.shape
-        (u, k, b) = read_scantrons(config["scantron_filename"], N_e, N_Q, N_A, config)
+        if config["scantron_CSV"]:
+            (u, k, b) = read_scantrons_CSV(config["scantron_filename"], N_e, N_Q, N_A, config)
+        else:
+            (u, k, b) = read_scantrons(config["scantron_filename"], N_e, N_Q, N_A, config)
         if config["check_valid_netids"]:
             netids = read_netids(config["netids_filename"])
             check_netids(u, netids)
@@ -255,7 +259,10 @@ def read_config(config_filename, default_config):
 
     # input filenames
     config["library_filename"] = prefix + "library.tex"
-    config["scantron_filename"] = prefix + "scantron.dat"
+    if config["scantron_CSV"]:
+        config["scantron_filename"] = prefix + "scantron.csv"
+    else:
+        config["scantron_filename"] = prefix + "scantron.dat"
     config["netids_filename"] = prefix + "netids.txt"
 
     # output filenames
@@ -1182,6 +1189,65 @@ def read_scantrons(input_filename, N_e, N_Q, N_A, config):
 
             log("%s:%s: student %s/%s/%s/%s"
                 % (input_filename, i_line + 1, last_name, first_initial, student_number, network_id))
+
+            u_data.append([last_name, first_initial, student_number, network_id])
+            k_data.append(key)
+            b_data.append(answers)
+
+    u = np.array(u_data, dtype=object)
+    k = np.array(k_data, dtype=object)
+    b = np.array(b_data, dtype=int)
+    log_array(u, "u", ["N_s", "N_i"])
+    log_array(k, "k", ["N_s"])
+    log_array(b, "b", ["N_s", "N_Q", "N_A"])
+    log("Successfully completed reading Scantron file")
+    return (u, k, b)
+
+def read_scantrons_CSV(input_filename, N_e, N_Q, N_A, config):
+    """(u, k, b) = read_scantrons(input_filename, N_e, N_Q, N_A)
+
+    Read the scantron data arrays from scantron.dat.
+
+    u[s,i] = student s: last name, first initial, ID number, NetID (i = 0,...,3)
+    k[s] = exam key for student s
+    b[s,q,n] = student s on exam question q bubbled in n
+    """
+    log_and_print("Reading Scantron file: %s" % input_filename)
+    key_length = len(generate_key(0, N_e, N_A))
+    u_data = []
+    k_data = []
+    b_data = []
+    key_length = len(generate_key(0, N_e, N_A))
+    with open(input_filename, "r") as in_f:
+        reader = csv.reader(in_f)
+        for (i_row, row) in enumerate(reader):
+            if len(row) < 3 or len(row) > 4:
+                die("%s:%d: ERROR: expected 3 or 4 items in row, got %d"\
+                    %(input_filename, i_row + 1, len(row)))
+            # some basic reg. exp. substitution and parsing:
+            last_name, first_name = re.sub("[^A-Z ]", "*", row[0]).split()[0:2]
+            first_initial = first_name[0]
+            student_number = re.sub("[^0-9]", "*", row[1])
+            network_id = student_number ## UK doesn't have this
+            answers = re.sub("[^1-5 ]", "*", row[2])[0:N_Q]
+            # do we have to extract it out of the answers? or is it the last column?
+            if len(row) == 3:
+                key_end = config["last_scantron_question_number"]
+                key_start = key_end - key_length
+                key = re.sub("[^1-5 ]", "*", row[2])[key_start:key_end]
+            else:
+                key = re.sub("[^1-5 ]", "*", row[3])[0:key_length]
+
+            answers = [ [0,0,0,0,0] if c == " " else binary2bubble(1<<(int(c)-1))
+                       for c in answers]
+            # need to add this to make sure enough answers are present:
+            for nq in range(len(answers), N_Q):
+                answers.append([0, 0, 0, 0, 0])
+            key = "".join(["*" if c == " " else ind2chr(int(c)-1)
+                           for c in key])
+
+            log("%s:%s: student %s/%s/%s/%s"
+                % (input_filename, i_row + 1, last_name, first_initial, student_number, network_id))
 
             u_data.append([last_name, first_initial, student_number, network_id])
             k_data.append(key)
