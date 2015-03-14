@@ -1225,7 +1225,7 @@ def read_scantrons_CSV(input_filename, N_e, N_Q, N_A, config):
                 die("%s:%d: ERROR: expected 3 or 4 items in row, got %d"\
                     %(input_filename, i_row + 1, len(row)))
             # some basic reg. exp. substitution and parsing:
-            last_name, first_name = re.sub("[^A-Z ]", "*", row[0]).split()[0:2]
+            last_name, first_name = re.sub("[^A-Z ]", "*", row[0] + " CANTFILLOUTSCANTRON").split()[0:2]
             first_initial = first_name[0]
             student_number = re.sub("[^0-9]", "*", row[1])
             network_id = student_number ## UK doesn't have this
